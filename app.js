@@ -1,4 +1,6 @@
 const CONFIG = {
+  // You can also point this to another GitHub repo's raw music.json URL:
+  // e.g. 'https://raw.githubusercontent.com/username/metadata-repo/main/music.json'
   musicManifestUrl: './Music/music.json',
   playlistFileUrl: './playlist.json'
 };
@@ -6,17 +8,18 @@ const CONFIG = {
 const STORAGE = {
   playlists: 'sp_user_playlists_v1',
   liked: 'sp_liked_tracks_v1',
-  volume: 'sp_volume_v1'
+  volume: 'sp_volume_v1',
+  metaCache: 'sp_meta_cache_v1'
 };
 
 const ICONS = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>',
-  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
-  heartFilled: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+  heart: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+  heartFilled: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>',
-  note: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  note: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
   user: '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z"/></svg>',
   disc: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>',
   shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
@@ -27,6 +30,8 @@ const state = {
   tracks: [],
   artists: new Map(),
   albums: new Map(),
+  artistMeta: {},
+  albumMeta: {},
   sharedPlaylists: [],
   userPlaylists: [],
   likedFiles: new Set(),
@@ -103,6 +108,10 @@ function formatTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function setRangeFill(el, pct) {
+  if (el) el.style.setProperty('--pct', `${Math.max(0, Math.min(100, pct))}%`);
+}
+
 function notify(msg, isError = false) {
   const el = $('#toast');
   el.textContent = msg;
@@ -168,15 +177,17 @@ function loadLocalData() {
     }
   } catch {}
 
+  let vol = 0.8;
   try {
-    const vol = parseFloat(localStorage.getItem(STORAGE.volume));
-    if (Number.isFinite(vol) && vol >= 0 && vol <= 1) {
-      state.lastVolume = vol;
-      audio.volume = vol;
-      video.volume = vol;
-      $('#volumeBar').value = Math.round(vol * 100);
-    }
+    const saved = parseFloat(localStorage.getItem(STORAGE.volume));
+    if (Number.isFinite(saved) && saved >= 0 && saved <= 1) vol = saved;
   } catch {}
+  state.lastVolume = vol;
+  audio.volume = vol;
+  video.volume = vol;
+  $('#volumeBar').value = Math.round(vol * 100);
+  setRangeFill($('#volumeBar'), vol * 100);
+  setRangeFill($('#seekBar'), 0);
 }
 
 function saveUserPlaylists() {
@@ -185,6 +196,122 @@ function saveUserPlaylists() {
 
 function saveLiked() {
   localStorage.setItem(STORAGE.liked, JSON.stringify([...state.likedFiles]));
+}
+
+/* ---------- Automatic Metadata Lookup (iTunes JSONP) ---------- */
+
+function getMetaCache() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE.metaCache) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveMetaCache(cache) {
+  try {
+    localStorage.setItem(STORAGE.metaCache, JSON.stringify(cache));
+  } catch {}
+}
+
+function fetchITunesMetadata(query) {
+  return new Promise((resolve) => {
+    const cbName = `it_cb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 5000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      script.remove();
+    }
+
+    window[cbName] = (data) => {
+      cleanup();
+      const item = data && Array.isArray(data.results) ? data.results[0] : null;
+      if (!item) return resolve(null);
+      resolve({
+        title: item.trackName || '',
+        artist: item.artistName || '',
+        album: item.collectionName || '',
+        year: item.releaseDate ? String(item.releaseDate).slice(0, 4) : '',
+        genre: item.primaryGenreName || '',
+        cover: item.artworkUrl100 ? item.artworkUrl100.replace(/100x100bb/i, '600x600bb') : ''
+      });
+    };
+
+    script.onerror = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    script.src = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1&callback=${cbName}`;
+    document.head.appendChild(script);
+  });
+}
+
+async function enrichMissingMetadata() {
+  const cache = getMetaCache();
+  let updatedAny = false;
+
+  const applyMeta = (track, meta) => {
+    if (!meta) return false;
+    let changed = false;
+    if (track.artist === 'Unknown Artist' && meta.artist) {
+      track.artist = meta.artist;
+      changed = true;
+    }
+    if ((!track.hasExplicitAlbum || track.album === 'Singles') && meta.album) {
+      track.album = meta.album;
+      track.hasExplicitAlbum = true;
+      changed = true;
+    }
+    if (!track.cover && meta.cover) {
+      track.cover = safeUrl(meta.cover);
+      changed = true;
+    }
+    if (!track.year && meta.year) {
+      track.year = meta.year;
+      changed = true;
+    }
+    return changed;
+  };
+
+  const toFetch = [];
+  for (const track of state.tracks) {
+    if (track.cover && track.artist !== 'Unknown Artist' && track.hasExplicitAlbum) continue;
+    const cached = cache[track.file];
+    if (cached) {
+      if (applyMeta(track, cached)) updatedAny = true;
+    } else {
+      toFetch.push(track);
+    }
+  }
+
+  if (updatedAny) {
+    buildIndexes(state.artistMeta, state.albumMeta);
+    renderSidebar();
+    renderMain();
+    if (state.currentTrackId) updateNowPlayingUI();
+  }
+
+  for (const track of toFetch.slice(0, 20)) {
+    const q = track.artist !== 'Unknown Artist' ? `${track.title} ${track.artist}` : track.title;
+    const meta = await fetchITunesMetadata(q);
+    if (meta) {
+      cache[track.file] = meta;
+      saveMetaCache(cache);
+      if (applyMeta(track, meta)) {
+        buildIndexes(state.artistMeta, state.albumMeta);
+        renderSidebar();
+        renderMain();
+        if (state.currentTrackId === track.id) updateNowPlayingUI();
+      }
+    }
+  }
 }
 
 /* ---------- Data Loading ---------- */
@@ -223,22 +350,35 @@ async function fetchGitHubMusicTree() {
   const info = githubRepoInfo();
   if (!info) throw new Error('Not github.io');
 
-  const cacheKey = `gh_tree_${info.owner}/${info.repo}`;
+  const cacheKey = `gh_tree_v2_${info.owner}/${info.repo}`;
+  let cached = null;
   try {
-    const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
-    if (cached && Date.now() - cached.ts < 15 * 60 * 1000) {
-      return cached.tree;
-    }
+    cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
   } catch {}
 
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (cached?.etag) {
+    headers['If-None-Match'] = cached.etag;
+  }
+
   const url = `https://api.github.com/repos/${encodeURIComponent(info.owner)}/${encodeURIComponent(info.repo)}/git/trees/HEAD?recursive=1`;
-  const res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
-  if (!res.ok) throw new Error('GitHub API limit or unreachable');
+  const res = await fetch(url, { headers });
+
+  if (res.status === 304 && cached?.tree) {
+    return cached.tree;
+  }
+
+  if (!res.ok) {
+    if (cached?.tree) return cached.tree;
+    throw new Error(`GitHub API returned ${res.status}`);
+  }
+
   const data = await res.json();
   const tree = Array.isArray(data.tree) ? data.tree : [];
+  const etag = res.headers.get('ETag') || '';
 
   try {
-    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), tree }));
+    sessionStorage.setItem(cacheKey, JSON.stringify({ etag, tree }));
   } catch {}
 
   return tree;
@@ -270,7 +410,6 @@ async function loadMusicLibrary() {
     rawSongs = Array.isArray(manifest) ? manifest : (manifest.songs || manifest.tracks || []);
   }
 
-  // If no music.json or its "songs" array is empty, auto-scan the Music folder
   if (!rawSongs.length) {
     try {
       const allLinks = [];
@@ -281,7 +420,7 @@ async function loadMusicLibrary() {
         } catch {}
       }
       allLinks.forEach((rel) => {
-        if (/\.mp3$/i.test(rel)) rawSongs.push({ file: rel });
+        if (/\.mp3$/i.test(rel)) rawSongs.push({ file: rel, url: `./Music/${encodeFilePath(rel)}` });
         else if (/\.(mp4|m4v|webm)$/i.test(rel)) rawVideos.set(mediaKey(rel), `./Music/${encodeFilePath(rel)}`);
         else if (/\.(jpg|jpeg|png|webp)$/i.test(rel)) rawCovers.set(mediaKey(rel), `./Music/${encodeFilePath(rel)}`);
       });
@@ -293,25 +432,27 @@ async function loadMusicLibrary() {
         tree.forEach((node) => {
           if (node.type !== 'blob' || !/^Music\//i.test(node.path)) return;
           const rel = node.path.replace(/^Music\//i, '');
+          const exactUrl = `./${encodeFilePath(node.path)}`;
           if (/\.mp3$/i.test(rel)) {
-            rawSongs.push({ file: rel });
+            rawSongs.push({ file: rel, url: exactUrl });
           } else if (/\.(mp4|m4v|webm)$/i.test(rel)) {
-            rawVideos.set(mediaKey(rel), `./${encodeFilePath(node.path)}`);
+            rawVideos.set(mediaKey(rel), exactUrl);
           } else if (/\.(jpg|jpeg|png|webp)$/i.test(rel)) {
-            const url = `./${encodeFilePath(node.path)}`;
-            rawCovers.set(mediaKey(rel), url);
+            rawCovers.set(mediaKey(rel), exactUrl);
             const dir = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
             if (dir && /^(cover|folder|front|artwork)\./i.test(rel.split('/').pop())) {
-              rawCovers.set(`dir:${dir.toLowerCase()}`, url);
+              rawCovers.set(`dir:${dir.toLowerCase()}`, exactUrl);
             }
           }
         });
-      } catch {}
+      } catch (err) {
+        console.warn('Could not scan GitHub Music folder:', err);
+      }
     }
   }
 
-  const artistMeta = (manifest && manifest.artists) || {};
-  const albumMeta = (manifest && manifest.albums) || {};
+  state.artistMeta = (manifest && manifest.artists) || {};
+  state.albumMeta = (manifest && manifest.albums) || {};
 
   state.tracks = rawSongs
     .map((item, idx) => {
@@ -321,7 +462,7 @@ async function loadMusicLibrary() {
 
       const parsed = parseFilename(file, src.title, src.artist, src.album);
       const dir = file.includes('/') ? file.slice(0, file.lastIndexOf('/')).toLowerCase() : '';
-      const aMeta = albumMeta[parsed.album] || {};
+      const aMeta = state.albumMeta[parsed.album] || {};
       const cover = safeUrl(
         src.cover ||
         aMeta.cover ||
@@ -347,7 +488,7 @@ async function loadMusicLibrary() {
     })
     .filter(Boolean);
 
-  buildIndexes(artistMeta, albumMeta);
+  buildIndexes(state.artistMeta, state.albumMeta);
 }
 
 function buildIndexes(artistMeta = {}, albumMeta = {}) {
@@ -461,7 +602,7 @@ function getPlaylistTracks(playlist) {
 
 function renderPlaylistArt(playlist, sizeClass = '') {
   if (playlist.isLiked) {
-    return `<div class="${sizeClass} liked">${ICONS.heartFilled}</div>`;
+    return `<div class="${sizeClass} liked">${ICONS.heart}</div>`;
   }
   if (playlist.cover) {
     return `<div class="${sizeClass}"><img src="${escapeHTML(playlist.cover)}" data-fallback="note" alt="" loading="lazy"></div>`;
@@ -578,7 +719,7 @@ async function loadAndPlayTrack(trackId) {
   try {
     await media.play();
   } catch {
-    notify(`Could not play "${track.title}". Check that the MP3 file exists in your Music folder.`, true);
+    notify(`Could not play "${track.title}".`, true);
   }
 }
 
@@ -913,7 +1054,7 @@ function renderHomeView() {
       <span style="color:var(--text-subdued);font-size:14px;">${state.tracks.length} ${state.tracks.length === 1 ? 'song' : 'songs'}</span>
     </div>
     ${renderTrackTable(state.tracks, {
-      emptyMessage: 'No MP3s found yet. Upload .mp3 files into your Music/ folder on GitHub.'
+      emptyMessage: 'No MP3s found yet. Upload .mp3 files into your Music/ folder.'
     })}
   `;
 }
@@ -1012,7 +1153,7 @@ async function renderPlaylistView(id) {
   const ids = tracks.map((t) => t.id);
   const isPlayingThis = state.currentTrackId && ids.includes(state.currentTrackId) && !activeMedia().paused;
   const sampleSrc = pl.cover || tracks.find((t) => t.cover)?.cover || '';
-  const tint = pl.isLiked ? '#4a2f8f' : await sampleImageColor(sampleSrc, '#2b2b2b');
+  const tint = pl.isLiked ? '#242424' : await sampleImageColor(sampleSrc, '#2b2b2b');
 
   return `
     <div class="entity-hero" style="--hero-tint:${tint};">
@@ -1194,7 +1335,7 @@ function renderInlineAddResults(playlistId, query) {
   `).join('');
 }
 
-/* ---------- Playlist CRUD & Export ---------- */
+/* ---------- Playlist CRUD ---------- */
 
 function openPlaylistModal(playlistId = null) {
   const modal = $('#playlistModal');
@@ -1317,20 +1458,6 @@ function showAddToPlaylistPopover(anchorBtn, file) {
   activePopover = pop;
 }
 
-function exportPlaylistsJSON() {
-  const exported = state.userPlaylists.map(({ id, name, description, cover, songs }) => ({
-    id, name, description, cover, pinValue: 'none', songs
-  }));
-  const blob = new Blob([JSON.stringify({ playlists: exported }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'playlist.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  notify('Downloaded playlist.json');
-}
-
 /* ---------- Event Listeners ---------- */
 
 document.addEventListener('click', (e) => {
@@ -1362,6 +1489,7 @@ document.addEventListener('click', (e) => {
 
   const qpPlaylist = e.target.closest('[data-quick-play-playlist]');
   if (qpPlaylist) {
+    e.preventDefault();
     e.stopPropagation();
     const pl = getPlaylist(qpPlaylist.dataset.quickPlayPlaylist);
     playFromList(getPlaylistTracks(pl).map((t) => t.id), 0);
@@ -1370,6 +1498,7 @@ document.addEventListener('click', (e) => {
 
   const qpAlbum = e.target.closest('[data-quick-play-album]');
   if (qpAlbum) {
+    e.preventDefault();
     e.stopPropagation();
     const alb = [...state.albums.values()].find((a) => a.id === qpAlbum.dataset.quickPlayAlbum);
     if (alb) playFromList(alb.tracks.map((t) => t.id), 0);
@@ -1378,6 +1507,7 @@ document.addEventListener('click', (e) => {
 
   const qpArtist = e.target.closest('[data-quick-play-artist]');
   if (qpArtist) {
+    e.preventDefault();
     e.stopPropagation();
     const art = state.artists.get(qpArtist.dataset.quickPlayArtist);
     if (art) playFromList(art.tracks.map((t) => t.id), 0);
@@ -1536,7 +1666,6 @@ $('#fwdBtn').addEventListener('click', () => {
 
 $('#newPlaylistBtn').addEventListener('click', () => openPlaylistModal());
 $('#topCreatePlaylistBtn').addEventListener('click', () => openPlaylistModal());
-$('#exportPlaylistsBtn').addEventListener('click', exportPlaylistsJSON);
 
 $('#plCoverFile').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
@@ -1611,6 +1740,8 @@ $('#npLikeBtn').addEventListener('click', () => {
 
 $('#seekBar').addEventListener('input', (e) => {
   const media = activeMedia();
+  const pct = Number(e.target.value) / 10;
+  setRangeFill(e.target, pct);
   if (Number.isFinite(media.duration)) {
     media.currentTime = (Number(e.target.value) / 1000) * media.duration;
   }
@@ -1622,6 +1753,7 @@ $('#volumeBar').addEventListener('input', (e) => {
   state.muted = v === 0;
   audio.volume = v;
   video.volume = v;
+  setRangeFill(e.target, v * 100);
   localStorage.setItem(STORAGE.volume, String(v));
 });
 
@@ -1631,6 +1763,7 @@ $('#muteBtn').addEventListener('click', () => {
   audio.volume = v;
   video.volume = v;
   $('#volumeBar').value = Math.round(v * 100);
+  setRangeFill($('#volumeBar'), v * 100);
 });
 
 [audio, video].forEach((media) => {
@@ -1659,7 +1792,9 @@ $('#muteBtn').addEventListener('click', () => {
     if (media !== activeMedia()) return;
     $('#elapsedTime').textContent = formatTime(media.currentTime);
     if (Number.isFinite(media.duration) && media.duration > 0) {
-      $('#seekBar').value = Math.round((media.currentTime / media.duration) * 1000);
+      const ratio = media.currentTime / media.duration;
+      $('#seekBar').value = Math.round(ratio * 1000);
+      setRangeFill($('#seekBar'), ratio * 100);
     }
   });
 
@@ -1696,4 +1831,5 @@ if ('mediaSession' in navigator) {
   renderNavButtons();
   renderSidebar();
   renderMain();
+  enrichMissingMetadata();
 })();

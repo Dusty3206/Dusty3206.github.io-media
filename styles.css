@@ -173,7 +173,12 @@ img { display: block; max-width: 100%; }
   color: var(--text-subdued);
 }
 .lib-thumb.round { border-radius: 50%; }
-.lib-thumb.liked { background: linear-gradient(135deg, #450af5, #c4efd9); color: #fff; }
+.lib-thumb.liked {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-subdued);
+}
+.lib-thumb svg { width: 22px; height: 22px; }
 .lib-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 .lib-meta { min-width: 0; flex: 1; }
@@ -200,14 +205,6 @@ img { display: block; max-width: 100%; }
   justify-content: space-between;
   align-items: center;
 }
-.text-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-subdued);
-  padding: 6px 10px;
-  border-radius: 4px;
-}
-.text-link:hover { color: var(--text-base); background: var(--bg-highlight); }
 
 /* Main Content */
 .main {
@@ -346,7 +343,14 @@ img { display: block; max-width: 100%; }
   display: grid;
   place-items: center;
   overflow: hidden;
+  color: var(--text-subdued);
 }
+.quick-cover.liked {
+  background: transparent;
+  border-right: 1px solid var(--border);
+  color: var(--text-subdued);
+}
+.quick-cover svg { width: 24px; height: 24px; }
 .quick-cover img { width: 100%; height: 100%; object-fit: cover; }
 .quick-title {
   font-weight: 700;
@@ -388,8 +392,13 @@ img { display: block; max-width: 100%; }
   color: var(--text-muted);
 }
 .card-art.round { border-radius: 50%; }
+.card-art.liked {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-subdued);
+}
 .card-art img { width: 100%; height: 100%; object-fit: cover; }
-.card-art svg { width: 42px; height: 42px; }
+.card-art > svg { width: 42px; height: 42px; }
 
 .mosaic {
   width: 100%;
@@ -415,6 +424,7 @@ img { display: block; max-width: 100%; }
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 0.2s ease, transform 0.2s ease, background 0.15s ease;
+  z-index: 2;
 }
 .media-card:hover .card-play-fab,
 .quick-card:hover .card-play-fab {
@@ -478,7 +488,11 @@ img { display: block; max-width: 100%; }
   color: var(--text-muted);
 }
 .hero-cover.round { border-radius: 50%; }
-.hero-cover.liked { background: linear-gradient(135deg, #450af5, #c4efd9); color: #fff; }
+.hero-cover.liked {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-subdued);
+}
 .hero-cover img { width: 100%; height: 100%; object-fit: cover; }
 .hero-cover svg { width: 56px; height: 56px; }
 
@@ -574,6 +588,8 @@ img { display: block; max-width: 100%; }
 .track-row.playing .t-name { color: var(--accent); }
 
 .t-idx {
+  width: 32px;
+  height: 32px;
   text-align: center;
   color: var(--text-subdued);
   font-variant-numeric: tabular-nums;
@@ -581,11 +597,12 @@ img { display: block; max-width: 100%; }
   display: grid;
   place-items: center;
 }
+.t-idx svg { width: 16px; height: 16px; }
 .t-idx .t-play-icon { display: none; color: var(--text-base); }
 .track-row:hover .t-idx .t-num,
 .track-row.playing .t-idx .t-num { display: none; }
 .track-row:hover .t-idx .t-play-icon,
-.track-row.playing .t-idx .t-play-icon { display: grid; }
+.track-row.playing .t-idx .t-play-icon { display: grid; place-items: center; }
 .track-row.playing .t-idx .t-play-icon { color: var(--accent); }
 
 .t-main {
@@ -605,6 +622,7 @@ img { display: block; max-width: 100%; }
   place-items: center;
   color: var(--text-muted);
 }
+.t-cover svg { width: 18px; height: 18px; }
 .t-cover img { width: 100%; height: 100%; object-fit: cover; }
 .t-info { min-width: 0; }
 .t-name {
@@ -698,6 +716,7 @@ img { display: block; max-width: 100%; }
   place-items: center;
   color: var(--text-muted);
 }
+.np-cover svg { width: 24px; height: 24px; }
 .np-cover img { width: 100%; height: 100%; object-fit: cover; }
 .np-text { min-width: 0; }
 .np-title {
@@ -776,15 +795,22 @@ img { display: block; max-width: 100%; }
 }
 .seek-wrap span:first-child { text-align: right; }
 
+/* Spotify Progress & Volume Bars */
 input[type="range"].sp-range {
+  --val: 0%;
+  --bar-fill: #ffffff;
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
   height: 4px;
   border-radius: 2px;
-  background: #4d4d4d;
+  background: linear-gradient(to right, var(--bar-fill) var(--val), #4d4d4d var(--val));
   outline: none;
   cursor: pointer;
+}
+.seek-wrap:hover input[type="range"].sp-range,
+.vol-wrap:hover input[type="range"].sp-range {
+  --bar-fill: var(--accent);
 }
 input[type="range"].sp-range::-webkit-slider-thumb {
   -webkit-appearance: none;
